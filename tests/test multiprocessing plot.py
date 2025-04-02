@@ -8,10 +8,10 @@ import time
 
 
 # Global variables for timestep and frequency
-time_factor = 50.               # time Acceleration Factor
+time_factor = 100.               # time Acceleration Factor
 calculation_frequency = 1000     # Calculation frequency (Hz)
 plot_frequency = 30              # plot update frequency (Hz)
-buffer_fill_in = 10              # Buffer Filling Time (s)
+buffer_fill_in = 50              # Buffer Filling Time (s)
 
 buffer_size = int(buffer_fill_in * calculation_frequency / time_factor)
 dtype = np.float64  # Data type
@@ -22,8 +22,8 @@ m_in_max = 100                  # Maximum flow rate [kg/s]
 # Define constants
 g = 9.81        # Gravity [m/s^2]
 rho = 1000      # Density [kg/m^3]
-a_out = 0.1     # Outflow area [m^2]
-a_int = 10      # Cross-sectional area of tank [m^2]
+a_out = 0.005   # Outflow area [m^2]
+a_int = 0.01    # Cross-sectional area of tank [m^2]
 
 
 # Worker function for the parallel computation
@@ -88,6 +88,12 @@ def plot_results(stop_flag, shared_name):
 
     plt.ion()  # Turn on interactive mode
     fig, axs = plt.subplots(nrows=2)
+    axs[0].set_xlabel('Time (s)')
+    axs[1].set_xlabel('Time (s)')
+    axs[0].set_ylabel('Height (m)')
+    axs[1].set_ylabel('flow rate (kg/s)')
+
+    plt.tight_layout()
 
     existing_shm = shm.SharedMemory(name=shared_name)
     buffer_arr = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf)
@@ -97,8 +103,9 @@ def plot_results(stop_flag, shared_name):
     while not stop_flag.is_set():
 
         start_time = time.time()
-        sorted_indices = np.argsort(np.nan_to_num(buffer_arr[:, 0], nan=np.inf))
-        sorted_buffer = buffer_arr[sorted_indices]
+        curr_buffer = buffer_arr.copy()
+        sorted_indices = np.argsort(np.nan_to_num(curr_buffer[:, 0], nan=np.inf))
+        sorted_buffer = curr_buffer[sorted_indices]
 
         for n, ax in enumerate(axs):
             ax.clear()
@@ -134,13 +141,14 @@ def plot_results(stop_flag, shared_name):
 
 
 # Keyboard input monitoring function
-def listen_for_esc(stop_flag, m_in_perc):
-    with keyboard.Listener(on_press=lambda key: stop_processes(key, stop_flag, m_in_perc)) as listener:
+def keyboard_listener(stop_flag, m_in_perc):
+    with keyboard.Listener(on_press=lambda key: on_key_pressed(key, stop_flag, m_in_perc)) as listener:
         listener.join()
 
     print("Listener finished!")
 
-def stop_processes(key, stop_flag, m_in_perc):
+
+def on_key_pressed(key, stop_flag, m_in_perc):
 
     if key == keyboard.Key.esc:
         print("Esc pressed! Terminating all processes...")
@@ -158,6 +166,7 @@ def stop_processes(key, stop_flag, m_in_perc):
             m_in_perc.value -= 1
 
     return True
+
 
 def run_simulation():
 
@@ -179,7 +188,7 @@ def run_simulation():
     plot_process.start()
 
     # Start keyboard input monitoring process
-    listen_for_esc(stop_flag, m_in_perc)
+    keyboard_listener(stop_flag, m_in_perc)
 
     # Wait for the workers to finish
     calc_process.join()
