@@ -38,14 +38,17 @@ def worker(stop_flag, shared_name, m_in_perc):
     existing_shm = shm.SharedMemory(name=shared_name)
     buffer_arr = np.ndarray(shape, dtype=dtype, buffer=existing_shm.buf)
 
-    mean_sleep_time = 0.
     count = 0.
+    mean_sleep_time = 0.
+
     while not stop_flag.is_set():
 
         start_time = time.time()
 
         # Perform your calculation step
         v_out = np.sqrt(2 * g * h)
+        if np.isnan(v_out):
+            v_out = 0.
         m_out = rho * v_out * a_out
         dt = time_factor / calculation_frequency
 
@@ -66,7 +69,7 @@ def worker(stop_flag, shared_name, m_in_perc):
         mean_sleep_time += sleep_time / t_sleep_max
         count += 1
 
-        time.sleep(sleep_time)  # Sleep for the remainder of the timeste
+        time.sleep(sleep_time)  # Sleep for the remainder of the timestep
 
     mean_sleep_time = mean_sleep_time / count
     occupation = 1 - mean_sleep_time
